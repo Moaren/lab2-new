@@ -4,9 +4,9 @@ from debug import *
 from zoodb import *
 
 import auth_client
-#import bank_client
-import bank
+import bank_client
 import random
+
 
 class User(object):
     def __init__(self):
@@ -20,6 +20,7 @@ class User(object):
             return None
 
     def loginCookie(self, username, token):
+        print "loginCookie (%s,%s)" % (username, token)
         self.setPerson(username, token)
         return "%s#%s" % (username, token)
 
@@ -28,10 +29,12 @@ class User(object):
 
     def addRegistration(self, username, password):
         token = auth_client.register(username, password)
-        #bank_client.check_in(username)
+        bank_client.check_in(username)
+        print "addRegistration token=%s" % token
         if token is not None:
             return self.loginCookie(username, token)
         else:
+            print "addRegistration token is null"
             return None
 
     def checkCookie(self, cookie):
@@ -45,7 +48,8 @@ class User(object):
         persondb = person_setup()
         self.person = persondb.query(Person).get(username)
         self.token = token
-        self.zoobars = bank.balance(username)
+        self.zoobars = bank_client.balance(username)
+
 
 def logged_in():
     g.user = User()
@@ -55,6 +59,7 @@ def logged_in():
     else:
         return False
 
+
 def requirelogin(page):
     @wraps(page)
     def loginhelper(*args, **kwargs):
@@ -63,6 +68,7 @@ def requirelogin(page):
         else:
             return page(*args, **kwargs)
     return loginhelper
+
 
 @catch_err
 def login():
@@ -75,6 +81,7 @@ def login():
         password = request.form.get('login_password')
 
         if 'submit_registration' in request.form:
+            print "submit_registration (%s,%s)" % (username, password)
             if not username:
                 login_error = "You must supply a username to register."
             elif not password:
@@ -84,6 +91,7 @@ def login():
                 if not cookie:
                     login_error = "Registration failed."
         elif 'submit_login' in request.form:
+            print "submit (%s,%s)" % (username, password)
             if not username:
                 login_error = "You must supply a username to log in."
             elif not password:
@@ -96,9 +104,9 @@ def login():
     nexturl = request.values.get('nexturl', url_for('index'))
     if cookie:
         response = redirect(nexturl)
-        ## Be careful not to include semicolons in cookie value; see
-        ## https://github.com/mitsuhiko/werkzeug/issues/226 for more
-        ## details.
+        # Be careful not to include semicolons in cookie value; see
+        # https://github.com/mitsuhiko/werkzeug/issues/226 for more
+        # details.
         response.set_cookie('PyZoobarLogin', cookie)
         return response
 
@@ -106,6 +114,7 @@ def login():
                            nexturl=nexturl,
                            login_error=login_error,
                            login_username=Markup(request.form.get('login_username', '')))
+
 
 @catch_err
 def logout():

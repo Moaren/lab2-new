@@ -56,10 +56,10 @@ cp /etc/resolv.conf /jail/etc/
 mkdir -p /jail/usr/share/zoneinfo
 cp -r /usr/share/zoneinfo/America /jail/usr/share/zoneinfo/
 
-create_socket_dir /jail/echosvc 61010:61010 755
-create_socket_dir /jail/authsvc 61016:1000 755
-create_socket_dir /jail/banksvc 61017:1000 755
-#create_socket_dir /jail/profilesvc/sock 0:0 750
+create_socket_dir /jail/echosvc 61010:61010 750
+create_socket_dir /jail/authsvc 61016:1000 750
+create_socket_dir /jail/banksvc 61017:1000 750
+create_socket_dir /jail/profilesvc/sock 0:0 750
 
 mkdir -p /jail/tmp
 chmod a+rwxt /jail/tmp
@@ -73,25 +73,23 @@ rm -rf /jail/zoobar/db
 python /jail/zoobar/zoodb.py init-person
 python /jail/zoobar/zoodb.py init-transfer
 python /jail/zoobar/zoodb.py init-cred
-#python /jail/zoobar/zoodb.py init-bank
+python /jail/zoobar/zoodb.py init-bank
 
+set_perms 61011:61011 750 /jail/zoobar/echo-server.py
 set_perms 61016:1000 750 /jail/zoobar/auth-server.py
-#set_perms 61017:1000 750 /jail/zoobar/bank-server.py
+set_perms 61017:1000 750 /jail/zoobar/bank-server.py
 
 set_perms 61012:1000 755 /jail/zoobar
 set_perms 61012:1000 755 /jail/zoobar/db
 set_perms 61012:1000 775 /jail/zoobar/db/person
 set_perms 61012:1000 775 /jail/zoobar/db/person/person.db
-set_perms 61012:1000 775 /jail/zoobar/db/transfer
-set_perms 61012:1000 775 /jail/zoobar/db/transfer/transfer.db
 
 set_perms 61014:1000 775 /jail/zoobar/index.cgi
 
 set_perms 61016:1000 700 /jail/zoobar/db/cred
 set_perms 61016:1000 700 /jail/zoobar/db/cred/cred.db
 
-#set_perms 61017:1000 700 /jail/zoobar/db/bank
-#set_perms 61017:1000 700 /jail/zoobar/db/bank/bank.db
-#set_perms 61017:1000 700 /jail/zoobar/db/transfer
-#set_perms 61017:1000 700 /jail/zoobar/db/transfer/transfer.db
-
+set_perms 61017:1000 750 /jail/zoobar/db/bank
+set_perms 61017:1000 750 /jail/zoobar/db/bank/bank.db
+set_perms 61017:1000 750 /jail/zoobar/db/transfer
+set_perms 61017:1000 750 /jail/zoobar/db/transfer/transfer.db

@@ -14,9 +14,9 @@
 #include <string.h>
 #include "http.h"
 
-#define ZOOK_CONF    "zook.conf"
+#define ZOOK_CONF "zook.conf"
 #define MAX_SERVICES 256
-#define MAX_GIDS     256
+#define MAX_GIDS 256
 
 static int svcfds[MAX_SERVICES];
 static char svcnames[MAX_SERVICES][256];
@@ -119,7 +119,7 @@ pid_t launch_svc(CONF *conf, const char *name)
     {
     case -1: /* error */
         err(1, "fork");
-    case 0:  /* child */
+    case 0: /* child */
         close(fds[0]);
         break;
     default: /* parent */
@@ -138,7 +138,7 @@ pid_t launch_svc(CONF *conf, const char *name)
     /* split extra arguments */
     if ((args = NCONF_get_string(conf, name, "args")))
     {
-        for (ap = &argv[2]; (*ap = strsep(&args, " \t")) != NULL; )
+        for (ap = &argv[2]; (*ap = strsep(&args, " \t")) != NULL;)
             if (**ap != '\0')
                 if (++ap >= &argv[31])
                     break;
@@ -147,24 +147,26 @@ pid_t launch_svc(CONF *conf, const char *name)
     if ((dir = NCONF_get_string(conf, name, "dir")))
     {
         /* chroot into dir */
-       if(chdir(dir)){
-            err(1,"chdir");
+        if (chdir(dir))
+        {
+            err(1, "chdir");
         }
-        if(!getuid()){//if under root
-            if(chroot(".")){
-                err(1,"chroot");
+        if (!getuid())
+        {
+            if (chroot("."))
+            {
+                err(1, "chroot");
             }
-            warnx("chroot %s",dir);
+            warnx("chroot %s", dir);
         }
     }
-
 
     if (NCONF_get_number_e(conf, name, "gid", &gid))
     {
         /* change real, effective, and saved gid to gid */
-        if(setresgid(gid,gid,gid))
+        if (setresgid(gid, gid, gid))
         {
-            err(1,"setgid");
+            err(1, "setgid");
         }
         warnx("setgid %ld", gid);
     }
@@ -180,11 +182,10 @@ pid_t launch_svc(CONF *conf, const char *name)
     if (NCONF_get_number_e(conf, name, "uid", &uid))
     {
         /* change real, effective, and saved uid to uid */
-        if(setresuid(uid,uid,uid))
+        if (setresuid(uid, uid, uid))
         {
-            err(1,"setuid");
+            err(1, "setuid");
         }
-        warnx("setuid %ld", uid);
     }
 
     signal(SIGCHLD, SIG_DFL);

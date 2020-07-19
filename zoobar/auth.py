@@ -34,14 +34,9 @@ def register(username, password):
         return None
     newperson = Person()
     newperson.username = username
-    #newperson.password = password
-    #db.add(newperson)
-    #db.commit()
-    #return newtoken(db, newperson)
     db_person.add(newperson)
     db_person.commit()
 
-    # salt to secure password
     salt = os.urandom(32).encode('hex')
     password = pbkdf2.PBKDF2(password,salt).hexread(32)
     db_cred = cred_setup()

@@ -1,82 +1,68 @@
-#!/usr/bin/env python2
-
-import rpclib
-import sys
+#!/usr/bin/python2
 import os
-import sandboxlib
-import urllib
-import hashlib
-import socket
-import bank
-import zoodb
+import resource
+import sys
+import fcntl
+import signal
+import threading
 
-from debug import *
+class ProcessTimeout(threading.Thread):
+    def __init__(self, pid, timeout):
+        threading.Thread.__init__(self)
+        self.pid = pid
+        self.timeout = timeout
+        self.killing = threading.Event()
+        self.killed = threading.Event()
 
-## Cache packages that the sandboxed code might want to import
-import time
-import errno
+    def kill(self):
+        if not self.killing.is_set():
+            self.killing.set()
+            os.kill(self.pid, signal.SIGKILL)
+            (_, status) = os.waitpid(self.pid, 0)
+            assert(os.WIFEXITED(status) or os.WIFSIGNALED(status))
+            self.killed.set()
+        self.killed.wait()
 
-class ProfileAPIServer(rpclib.RpcServer):
-    def __init__(self, user, visitor):
-        self.user = user
-        self.visitor = visitor
+    def run(self):
+        self.killed.wait(self.timeout)
+        self.kill()
 
-    def rpc_get_self(self):
-        return self.user
+class Sandbox(object):
+    def __init__(self, dir, uid, lockfile, timeout=5.0):
+        self.dir = dir
+        self.uid = uid
+        self.lockfile = lockfile
+        self.timeout = timeout
 
-    def rpc_get_visitor(self):
-        return self.visitor
+    def child(self, func):
+        os.chroot(self.dir)
+        os.chdir('/')
+        resource.setrlimit(resource.RLIMIT_NPROC, (0, 0))
+        os.setresuid(self.uid, self.uid, self.uid)
+        func()
 
-    def rpc_get_xfers(self, username):
-        xfers = []
-        for xfer in bank.get_log(username):
-            xfers.append({ 'sender': xfer.sender,
-                           'recipient': xfer.recipient,
-                           'amount': xfer.amount,
-                           'time': xfer.time,
-                         })
-        return xfers
+    def run(self, func):
+        with open(self.lockfile, 'w+') as lockf:
+            ## Only one instance allowed at a time, due to shared uid
+            fcntl.flock(lockf.fileno(), fcntl.LOCK_EX)
 
-    def rpc_get_user_info(self, username):
-        person_db = zoodb.person_setup()
-        p = person_db.query(zoodb.Person).get(username)
-        if not p:
-            return None
-        return { 'username': p.username,
-                 'profile': p.profile,
-                 'zoobars': bank.balance(username),
-               }
+            (piperd, pipewr) = os.pipe()
 
-    def rpc_xfer(self, target, zoobars):
-        bank.transfer(self.user, target, zoobars)
-
-def run_profile(pcode, profile_api_client):
-    globals = {'api': profile_api_client}
-    exec pcode in globals
-
-class ProfileServer(rpclib.RpcServer):
-    def rpc_run(self, pcode, user, visitor):
-        uid = 0
-
-        userdir = '/tmp'
-
-        (sa, sb) = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM, 0)
-        pid = os.fork()
-        if pid == 0:
-            if os.fork() <= 0:
-                sa.close()
-                ProfileAPIServer(user, visitor).run_sock(sb)
+            pid = os.fork()
+            if pid == 0:
+                lockf.close()
+                os.close(piperd)
+                os.close(0)
+                os.dup2(pipewr, 1)
+                self.child(func)
                 sys.exit(0)
-            else:
-                sys.exit(0)
-        sb.close()
-        os.waitpid(pid, 0)
 
-        sandbox = sandboxlib.Sandbox(userdir, uid, '/profilesvc/lockfile')
-        with rpclib.RpcClient(sa) as profile_api_client:
-            return sandbox.run(lambda: run_profile(pcode, profile_api_client))
+            pt = ProcessTimeout(pid, self.timeout)
+            pt.start()
 
-(_, dummy_zookld_fd, sockpath) = sys.argv
+            os.close(pipewr)
+            with os.fdopen(piperd, 'r') as piperf:
+                resp = piperf.read()
 
-s = ProfileServer()
-s.run_sockpath_fork(sockpath)
+            pt.kill()
+            return resp
